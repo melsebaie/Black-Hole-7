@@ -16,20 +16,24 @@ lookback = st.sidebar.slider("Lookback Period for Percent Rank", min_value=50, m
 
 # Function to calculate RS metrics
 def calculate_rs_and_rank(df, lookback=100):
-    df['ThreeMthRS'] = 0.4 * (df['Close'] / df['Close'].shift(63))
-    df['SixMthRS'] = 0.2 * (df['Close'] / df['Close'].shift(126))
-    df['NineMthRS'] = 0.2 * (df['Close'] / df['Close'].shift(189))
-    df['TwelveMthRS'] = 0.2 * (df['Close'] / df['Close'].shift(250))
-    
-    df['RSraw'] = df[['ThreeMthRS', 'SixMthRS', 'NineMthRS', 'TwelveMthRS']].sum(axis=1)
-    
-    df['PercentRank'] = df['Close'].rolling(window=lookback).apply(
-        lambda x: pd.Series(x).rank(pct=True).iloc[-1] * 100, raw=True
-    )
-    
-    df['Color_HSB'] = df['PercentRank'].apply(lambda x: (x * 64 / 100, 255, 255))
-    
-    return df
+    try:
+        df['ThreeMthRS'] = 0.4 * (df['Close'] / df['Close'].shift(63))
+        df['SixMthRS'] = 0.2 * (df['Close'] / df['Close'].shift(126))
+        df['NineMthRS'] = 0.2 * (df['Close'] / df['Close'].shift(189))
+        df['TwelveMthRS'] = 0.2 * (df['Close'] / df['Close'].shift(250))
+        
+        df['RSraw'] = df[['ThreeMthRS', 'SixMthRS', 'NineMthRS', 'TwelveMthRS']].sum(axis=1)
+        
+        df['PercentRank'] = df['Close'].rolling(window=lookback).apply(
+            lambda x: pd.Series(x).rank(pct=True).iloc[-1] * 100, raw=True
+        )
+        
+        df['Color_HSB'] = df['PercentRank'].apply(lambda x: (x * 64 / 100, 255, 255))
+        
+        return df
+    except Exception as e:
+        st.error(f"Error in RS calculation: {e}")
+        return None
 
 # Fetch data and process when the user clicks a button
 if st.button("Run Analysis"):
@@ -45,31 +49,18 @@ if st.button("Run Analysis"):
 
             # Calculate RS metrics
             result = calculate_rs_and_rank(df, lookback=lookback)
-            output = result[['Close', 'Volume', 'RSraw', 'PercentRank']]
+            if result is not None:
+                output = result[['Close', 'Volume', 'RSraw', 'PercentRank']].dropna()
 
-            # Display results
-            st.subheader(f"Analysis for {ticker}")
-            st.write("Last 5 rows of the data:")
-            st.dataframe(output.tail(), use_container_width=True)
+                # Display results
+                st.subheader(f"Analysis for {ticker}")
+                st.write("Last 5 rows of the data:")
+                st.dataframe(output.tail(), use_container_width=True)
 
-            # Plot closing prices
-            st.subheader("Closing Price Trend")
-            st.line_chart(output['Close'])
+                # Plot closing prices
+                st.subheader("Closing Price Trend")
+                st.line_chart(output['Close'])
 
-            # Provide Excel download option
-            st.subheader("Download Results")
-            excel_buffer = pd.ExcelWriter(f"{ticker}_RS_Analysis.xlsx", engine='openpyxl')
-            output.to_excel(excel_buffer, sheet_name=f'{ticker} Data', index=True)
-            excel_buffer.close()
-            with open(f"{ticker}_RS_Analysis.xlsx", "rb") as f:
-                st.download_button(
-                    label="Download Excel File",
-                    data=f,
-                    file_name=f"{ticker}_RS_Analysis.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
-    except Exception as e:
-        st.error(f"An error occurred: {e}")
-
-# Note about trading days
-st.sidebar.write(f"Note: There are approximately 270 trading days between {start_date} and {end_date}.")
+                # Provide Excel download option
+                st.subheader("Download Results")
+                excel_buffer = pd.ExcelWriter(f"{ticker}_RS_Analysis.xlsx", engine
