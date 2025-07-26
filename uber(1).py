@@ -39,13 +39,18 @@ def calculate_rs_and_rank(df, lookback=100):
 if st.button("Run Analysis"):
     try:
         # Fetch data from Yahoo Finance
-        df = yf.download(ticker, start=start_date, end=end_date, progress=False)
+        # Adjust start date to ensure enough data for 250-day lookback
+        adjusted_start_date = start_date - timedelta(days=365)  # Add buffer for lookback
+        df = yf.download(ticker, start=adjusted_start_date, end=end_date, progress=False)
         if df.empty:
             st.error("No data found for the ticker or date range. Please try again.")
         else:
             df = df[['Close', 'Volume']].copy()
             df.reset_index(inplace=True)
             df.set_index('Date', inplace=True)
+
+            # Filter data to user-specified date range
+            df = df.loc[start_date:end_date]
 
             # Calculate RS metrics
             result = calculate_rs_and_rank(df, lookback=lookback)
@@ -63,4 +68,19 @@ if st.button("Run Analysis"):
 
                 # Provide Excel download option
                 st.subheader("Download Results")
-                excel_buffer = pd.ExcelWriter(f"{ticker}_RS_Analysis.xlsx", engine
+                # Use BytesIO for in-memory Excel file to avoid file system issues
+                from io import BytesIO
+                excel_buffer = pd.ExcelWriter(BytesIO(), engine='openpyxl')
+                output.to_excel(excel_buffer, sheet_name=f'{ticker} Data', index=True)
+                excel_data = excel_buffer.getvalue()
+                st.download_button(
+                    label="Download Excel File",
+                    data=excel_data,
+                    file_name=f"{ticker}_RS_Analysis.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
+    except Exception as e:
+        st.error(f"An error occurred: {e}")
+
+# Note about trading days
+st.sidebar.write(f"Note: There are approximately 270 trading days between {start_date} and {end_date}.")
