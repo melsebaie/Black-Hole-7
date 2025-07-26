@@ -1,8 +1,15 @@
 import streamlit as st
-import pandas as pd
-import numpy as np
-import yfinance as yf
+try:
+    import pandas as pd
+    import numpy as np
+    import yfinance as yf
+    import openpyxl
+except ModuleNotFoundError as e:
+    st.error(f"Missing module: {e}. Please ensure all dependencies are listed in requirements.txt.")
+    st.stop()
+
 from datetime import datetime, timedelta
+from io import BytesIO
 
 # Streamlit app title
 st.title("Stock RS Analysis Dashboard")
@@ -39,8 +46,8 @@ def calculate_rs_and_rank(df, lookback=100):
 if st.button("Run Analysis"):
     try:
         # Fetch data from Yahoo Finance
-        # Adjust start date to ensure enough data for 250-day lookback
-        adjusted_start_date = start_date - timedelta(days=365)  # Add buffer for lookback
+        # Adjust start date for 250-day lookback
+        adjusted_start_date = start_date - timedelta(days=365)
         df = yf.download(ticker, start=adjusted_start_date, end=end_date, progress=False)
         if df.empty:
             st.error("No data found for the ticker or date range. Please try again.")
@@ -49,7 +56,7 @@ if st.button("Run Analysis"):
             df.reset_index(inplace=True)
             df.set_index('Date', inplace=True)
 
-            # Filter data to user-specified date range
+            # Filter to user-specified date range
             df = df.loc[start_date:end_date]
 
             # Calculate RS metrics
@@ -68,10 +75,9 @@ if st.button("Run Analysis"):
 
                 # Provide Excel download option
                 st.subheader("Download Results")
-                # Use BytesIO for in-memory Excel file to avoid file system issues
-                from io import BytesIO
-                excel_buffer = pd.ExcelWriter(BytesIO(), engine='openpyxl')
-                output.to_excel(excel_buffer, sheet_name=f'{ticker} Data', index=True)
+                excel_buffer = BytesIO()
+                with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
+                    output.to_excel(writer, sheet_name=f'{ticker} Data', index=True)
                 excel_data = excel_buffer.getvalue()
                 st.download_button(
                     label="Download Excel File",
